@@ -7,6 +7,7 @@ import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
 import android.webkit.URLUtil;
+import android.widget.Toast;
 
 import com.loopj.android.http.HttpGet;
 
@@ -30,6 +31,8 @@ import cz.msebera.android.httpclient.impl.client.DefaultHttpClient;
 
 public class DownloadAndInstall extends AsyncTask<String, Integer, Boolean> {
 
+    private static final String TAG = "DownloadAndInstall";
+
     private Context context;
     public DownloadAndInstall(Context context){
         this.context = context;
@@ -46,18 +49,12 @@ public class DownloadAndInstall extends AsyncTask<String, Integer, Boolean> {
             String fileName = URLUtil.guessFileName(url.toString(), null, null);
 
             HttpGet httpRequest = new HttpGet(url.toURI());
-            DefaultHttpClient httpclient = new DefaultHttpClient();
+            HttpClient httpclient = new DefaultHttpClient();
             HttpResponse response = (HttpResponse) httpclient.execute(httpRequest);
 
             HttpEntity entity = response.getEntity();
             BufferedHttpEntity bufHttpEntity = new BufferedHttpEntity(entity);
             InputStream is = bufHttpEntity.getContent();
-
-
-//            HttpURLConnection c = (HttpURLConnection) url.openConnection();
-//            c.setRequestMethod("GET");
-//            c.setDoOutput(true);
-//            c.connect();
 
             String PATH = Environment.getExternalStorageDirectory() + "/Download/";
             File folder = new File(PATH);
@@ -85,7 +82,7 @@ public class DownloadAndInstall extends AsyncTask<String, Integer, Boolean> {
             fos.close();
             is.close();
 
-            normalInstall(outputFile.getAbsolutePath());
+            AndroidCmdUtils.silentInstall(outputFile.getAbsolutePath());
 
             flag = true;
         } catch (Exception e) {
@@ -97,36 +94,15 @@ public class DownloadAndInstall extends AsyncTask<String, Integer, Boolean> {
 
     }
 
-
     public void normalInstall(String location) {
 
-        Log.i("DownloadAndInstall", "install...");
+        Log.i(TAG, "install...");
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setDataAndType(Uri.fromFile(new File(location)),"application/vnd.android.package-archive");
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
-        Log.i("DownloadAndInstall", "install done.");
+        Log.i(TAG, "install done.");
     }
 
-    private void silientInstall(String filename) {
-
-        Log.i("DownloadAndInstall", "install...");
-        File file = new File(filename);
-        if(file.exists()){
-            try {
-                final String command = "pm install -r " + file.getAbsolutePath();
-                Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", command });
-                proc.waitFor();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        Log.i("DownloadAndInstall", "install done.");
-    }
-
-    public static String insertEscape(String text) {
-        return text.replace(" ", "\\ ");
-    }
 
 }

@@ -1,9 +1,12 @@
 package com.videri.openchannelapp;
 
+import android.app.Activity;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Button;
+import android.widget.Toast;
 
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.AsyncHttpResponseHandler;
@@ -16,6 +19,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.security.cert.CertificateException;
+import java.util.Date;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -36,97 +40,87 @@ public class MainActivity extends AppCompatActivity {
 
     public static final String TAG = "AppDebug";
 
+    public static final String NBA_DEMO_PK = "com.videri.nba_demoapp";
+
+    Button startService, stopService;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         // scheduler each 30 seconds
-//        final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-//        service.scheduleWithFixedDelay(new Runnable() {
-//
-//            @Override
-//            public void run() {
-//                performTask();
-//            }
-//        }, 0, 30, TimeUnit.MINUTES);
+        final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+        service.scheduleWithFixedDelay(new Runnable() {
 
-        performTask();
+            @Override
+            public void run() {
+                performTask();
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+
     }
+
+    private static final String BASE_URL = "http://market.openchannel.io/v2";
+    private static final String M_ID = "5b05c984e7f24542145811be";
+    private static final String M_SECRECT = "TZ0OTnlZOt0Dp0NHJ3OZP1sh5VsulNk-pm28xBrqkHI";
 
     public void performTask() {
 
-        Log.d(TAG, "performTask...");
+        Log.d(TAG, "performTask... at: " + new Date().toLocaleString());
 
-        RequestParams requestParams = new RequestParams();
-        requestParams.add("query", "{'status.value':'approved'}");
-        requestParams.add("userId", "1");
+        try {
 
-        OpenChannelClient.get("/apps", requestParams, new JsonHttpResponseHandler() {
+            // get list of apps
+            JSONArray appListJson = OpenChannelClientHttp.getApps();
 
-            @Override
-            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
-                Log.d(TAG, errorResponse.toString());
-            }
+            // for each app
+            for (int i = 0; i < appListJson.length(); i++) {
 
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
+                JSONObject appJson = appListJson.getJSONObject(i);
 
-                Log.d(TAG, response.toString());
+                // get the ownership
+                JSONObject ownershipJson = appJson.getJSONObject("ownership");
 
-                try {
+                if (ownershipJson != null) {
 
-                    // get list of apps
-                    JSONArray appListJson = response.getJSONArray("list");
+                    // get ownershipStatus
+                    String ownershipStatus = ownershipJson.getString("ownershipStatus");
 
-                    // for each app
-                    for (int i = 0; i < appListJson.length(); i++) {
+                    Log.d(TAG, "ownershipStatus: " + ownershipStatus);
 
-                        JSONObject appJson = appListJson.getJSONObject(i);
+                    // if status is installed
+                    if ("active".equalsIgnoreCase(ownershipStatus)) {
 
-                        // get the ownership
-                        JSONObject ownershipJson = appJson.getJSONObject("ownership");
+                        // get custom data
+                        JSONObject customData = appJson.getJSONObject("customData");
 
-                        if (ownershipJson != null) {
+                        if (customData != null) {
+                            JSONArray filesJson = customData.getJSONArray("files");
 
-                            // get ownershipStatus
-                            String ownershipStatus = ownershipJson.getString("ownershipStatus");
+                            if (filesJson.length() > 0) {
 
-                            Log.d(TAG, "ownershipStatus: " + ownershipStatus);
+                                // get the apk file
+                                String apkFile = filesJson.getString(0);
 
-                            // if status is installed
-                            if ("uninstalled".equalsIgnoreCase(ownershipStatus)) {
-
-                                // get custom data
-                                JSONObject customData = appJson.getJSONObject("customData");
-
-                                if (customData != null) {
-                                    JSONArray filesJson = customData.getJSONArray("files");
-
-                                    if (filesJson.length() > 0) {
-
-                                        // get the apk file
-                                        String apkFile = filesJson.getString(0);
-
-                                        if (!apkFile.startsWith("http:")) {
-                                            apkFile = "http:".concat(apkFile);
-                                        }
-                                        Log.d(TAG, "apkFile: " + apkFile);
-
-                                        new DownloadAndInstall(getApplicationContext()).execute(apkFile);
-                                    }
+                                if (!apkFile.startsWith("http:")) {
+                                    apkFile = "http:".concat(apkFile);
                                 }
+
+                                Log.d(TAG, "apkFile: " + apkFile);
+
+                                new DownloadAndInstall(getApplicationContext()).execute(apkFile);
                             }
                         }
+                    } else if ("uninstalled".equalsIgnoreCase(ownershipStatus)) {
+
+                        // just for debug
+                        AndroidCmdUtils.silentUnInstall(NBA_DEMO_PK);
                     }
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                    Log.d(TAG, e.getMessage());
-
                 }
-
-
             }
-        });
+        } catch (Exception e){
+            e.printStackTrace();
+        }
     }
 }
