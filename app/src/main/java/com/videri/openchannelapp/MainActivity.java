@@ -73,6 +73,11 @@ public class MainActivity extends AppCompatActivity {
 
             // get list of apps
             JSONArray appListJson = OpenChannelClientHttp.getApps();
+            if (appListJson == null)
+            {
+                Log.d(TAG,"failure to get applist");
+                return;
+            }
 
             // for each app
             for (int i = 0; i < appListJson.length(); i++) {
